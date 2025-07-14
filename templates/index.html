@@ -1,0 +1,62 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Facial Anti-Spoofing</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #video, #liveFace { max-width: 640px; margin: 10px; }
+        #status { color: red; font-size: 18px; }
+    </style>
+</head>
+<body>
+    <h1>Facial Anti-Spoofing</h1>
+    <video id="video" width="640" height="480" autoplay></video>
+    <p>Live Face Output:</p>
+    <img id="liveFace" src="" style="display:none;" />
+    <p id="status">Sending frames...</p>
+    
+    <script>
+        const socket = io();
+        const video = document.getElementById('video');
+        const liveFace = document.getElementById('liveFace');
+        const status = document.getElementById('status');
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        // Access webcam
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                status.textContent = 'Error accessing webcam: ' + err;
+            });
+
+        // Send frames to server
+        function sendFrame() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const data = canvas.toDataURL('image/jpeg');
+            socket.emit('video_frame', data);
+        }
+
+        // Run every 100ms
+        setInterval(sendFrame, 100);
+
+        // Handle server responses
+        socket.on('live_face_detected', data => {
+            liveFace.src = data.image;
+            liveFace.style.display = 'block';
+            status.textContent = `Live face detected! Variance: ${data.variance.toFixed(6)}`;
+            status.style.color = 'green';
+        });
+
+        socket.on('frame_result', data => {
+            status.textContent = `Status: ${data.message}, Variance: ${data.variance.toFixed(6)}`;
+        });
+    </script>
+</body>
+</html>
